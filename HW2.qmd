@@ -1,0 +1,120 @@
+---
+title: "Exploring Patterns of Environmental Justice"
+subtitle: ""
+author: "Jackson Coldiron"
+date: 10-6-2025
+editor: visual
+format:
+  pdf:
+    toc: false
+    number-sections: false
+    latex-engine: xelatex
+execute:
+  echo: true       # assignment wants code visible
+  warning: false
+  message: false
+code-fold: false   # must NOT fold code in the PDF
+---
+![](data/oakland1.jpg){fig-align="center" out-width="100%" fig-cap="Photo credit: Ray Saint Germain/Bay City News"}
+
+## Introduction
+
+This assignment investigates how the legacy of 1930s HOLC “redlining” in Los Angeles relates to present-day environmental and socioeconomic conditions. Using EJScreen block-group indicators alongside digitized HOLC grades from Mapping Inequality, I’ll create maps and summaries to compare outcomes across grades. I’ll also spatially join 2021–2023 GBIF bird observations to HOLC areas to examine whether biodiversity data collection mirrors historic inequities. Together, these analyses use R (tmap/ggplot) to visualize patterns, quantify disparities, and reflect on mechanisms linking past policy to current environmental justice.
+
+#### Data Overview
+This analysis draws on three primary spatial datasets. The **HOLC Mapping Inequality** dataset provides 1930s neighborhood grades (A–D) for Los Angeles, representing historic redlining boundaries. The **EPA EJScreen** dataset contributes present-day demographic and environmental indicators at the census block group level, including measures such as particulate matter and income. Finally, **GBIF bird observations** from 2021–2023 offer point data on species occurrences, allowing for assessment of biodiversity sampling patterns across historical HOLC zones.
+
+#### Data Citation
+
+
+## Data Preparation
+```{r}
+# Load libraries
+library(tidyverse)
+library(dplyr)
+library(here)
+library(tmap)
+library(sf)
+library(tmaptools)
+library(ggplot2)
+library(maptiles)
+library(stars)
+
+# Bring in the data
+birds <- st_read(here("data", "gbif-birds-LA", "gbif-birds-LA.shp")) # CRS: EPSG 4326
+inequality <- st_read(here("data", "mapping-inequality", "mapping-inequality-los-angeles.json")) # CRS: EPSG 4326
+
+# CRS for birds and inequality match (checked in console with st_crs)
+
+# Check the class 
+#class(birds) #sf data.frame
+#class(inequality) #sf data.frame
+
+# Peak at the geometry type
+#st_geometry_type(birds) # point
+#st_geometry_type(inequality) # multipolygon
+
+```
+
+## Part 1: Current Legacy of Redlining in EJ
+#### Historical Redlining Map
+```{r}
+# Set static tmap mode
+tmap_mode("plot")
+
+# Factor the grades so there is a clear order distinction
+# A is best...
+ineq <- inequality |>
+  mutate(grade = factor(grade, levels = c("A", "B", "C", "D")))
+
+# Basemap creation use the get_tiles function from maptiles and choose CartoDB.Positron, zoom as to not load the entire basemap
+tiles <- get_tiles(ineq, provider = "CartoDB.Positron", zoom = 12)
+
+# Map of historical redlining neighborhoods
+# Include: 
+  # neighborhoods colored by HOLC grade
+  # an appopriate base map
+  # a clear title and legend
+
+historical_map <- 
+  tm_tiles("CartoDB.Positron", zoom = 12) +
+  tm_shape(ineq) + # add in inequality data
+  tm_polygons(fill = "grade") + # color by the grade
+    tm_compass(type = "arrow", position = c(0.08, 0.08), size = 2) +
+  tm_scale_bar(position = c(0.2, 0.05), text.size = 0.8) +
+  tm_layout(
+    legend.outside = FALSE,
+    legend.frame = FALSE,
+    frame = FALSE,
+    inner.margins = c(0.03, 0.03, 0.08, 0.03))
+
+historical_map
+```
+
+```{r}
+#| label: historical_redlining
+#| fig-cap: ""
+#| fig-width: 11
+#| fig-height: 7
+#| fig-align: center
+#| warning: false
+#| message: false
+
+historical_map
+```
+
+
+#### Summary Table
+
+
+#### Current Conditions
+
+#### Discussion
+
+## Part 2: Legacy of Redlining in Biodiversity Observations
+#### Observations within Redlined Neighborhoods
+
+#### Discussion
+
+
+
