@@ -39,12 +39,26 @@ library(tmaptools)
 library(ggplot2)
 library(maptiles)
 library(stars)
+library(paletteer)
+library(NatParksPalettes)
+
 
 # Bring in the data
 birds <- st_read(here("data", "gbif-birds-LA", "gbif-birds-LA.shp")) # CRS: EPSG 4326
 inequality <- st_read(here("data", "mapping-inequality", "mapping-inequality-los-angeles.json")) # CRS: EPSG 4326
+ejscreen <- st_read(here("data", "ejscreen", "EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb"))
 
-# CRS for birds and inequality match (checked in console with st_crs)
+# Verify CRS match
+if (st_crs(birds) != st_crs(inequality)) {
+  stop("CRS mismatch between birds and inequality data!")
+}
+
+# Transform ejscreen to match other datasets if needed
+if (st_crs(ejscreen) != st_crs(birds)) {
+  ejscreen <- st_transform(ejscreen, st_crs(birds))
+  cat("EJScreen transformed to match bird and inequality CRS\n")
+}
+
 
 # Check the class 
 #class(birds) #sf data.frame
@@ -58,6 +72,7 @@ inequality <- st_read(here("data", "mapping-inequality", "mapping-inequality-los
 
 ## Part 1: Current Legacy of Redlining in EJ
 #### Historical Redlining Map
+First, we will create a map of the historical redlining neighborhoods colored by the HOLC grades. 
 ```{r}
 # Set static tmap mode
 tmap_mode("plot")
@@ -67,28 +82,45 @@ tmap_mode("plot")
 ineq <- inequality |>
   mutate(grade = factor(grade, levels = c("A", "B", "C", "D")))
 
-# Basemap creation use the get_tiles function from maptiles and choose CartoDB.Positron, zoom as to not load the entire basemap
-tiles <- get_tiles(ineq, provider = "CartoDB.Positron", zoom = 12)
-
 # Map of historical redlining neighborhoods
 # Include: 
   # neighborhoods colored by HOLC grade
   # an appopriate base map
   # a clear title and legend
 
-historical_map <- 
-  tm_tiles("CartoDB.Positron", zoom = 12) +
-  tm_shape(ineq) + # add in inequality data
-  tm_polygons(fill = "grade") + # color by the grade
-    tm_compass(type = "arrow", position = c(0.08, 0.08), size = 2) +
+# Get Acadia palette colors
+acadia_colors <- c("#FED789FF", "#023743FF", "#72874EFF", "#476F84FF", "#A4BED5FF", "#453947FF")
+
+# First create the main map that shows the different HOLC grades over LA
+main_map <- 
+  tm_shape(ineq) +
+  tm_polygons(fill = "grade", # fill by the HOLC grades
+              palette = acadia_colors[1:4], # add in the new color palette
+              title = "HOLC Grade",
+              fill.legend = tm_legend(position = tm_pos_in("right", "top"))) +
+  tm_compass(type = "arrow", position = c(0.8, 0.08), size = 2) +
   tm_scale_bar(position = c(0.2, 0.05), text.size = 0.8) +
   tm_layout(
-    legend.outside = FALSE,
-    legend.frame = FALSE,
-    frame = FALSE,
-    inner.margins = c(0.03, 0.03, 0.08, 0.03))
+    title = "Historical Redlining in Los Angeles",
+    title.size = 1.2,
+    inner.margins = c(0.03, 0.03, 0.08, 0.03)) +
+  tm_basemap("CartoDB.PositronNoLabels")
 
-historical_map
+# Create a California bounding box for an inset map to add context
+ca_bbox <- st_as_sfc(tmaptools::bb("California")) # make it a spatial object with st_as_sfc()
+
+# Create inset map
+inset_map <- 
+  tm_shape(ca_bbox) +
+  tm_shape(ineq) +
+  tm_polygons(fill = "darkblue", border.col = "black") +
+  tm_layout(
+    frame = TRUE,
+    bg.color = "white",
+    inner.margins = c(0, 0, 0, 0)) +
+  tm_basemap("CartoDB.PositronNoLabels")
+
+
 ```
 
 ```{r}
@@ -100,21 +132,61 @@ historical_map
 #| warning: false
 #| message: false
 
+historical_map <- main_map +
+  tm_inset(inset_map)
+
 historical_map
 ```
 
 
 #### Summary Table
+Next, we want to investigate the percentage of census block groups that fall within each HOLC grade
+Also include the percent of census black groups that don’t fall within a HOLC grade
+Hint: The HOLC data contains the grades and the EJScreen data contains the census blocks, so you will need to combine the data spatially before doing summary statistics. Once you combine and no longer need the geometries, you can use st_drop_geometry().
+```{r}
+# Use st_join() to combine the HOLC and EJ Screen data which contains the census block information
+ejscreen_holc <- st_join(ejscreen, ineq)
+
+# Group_by() to obtain the percentage of block groups that fall within HOLC grade
+
+# Do the opposite: find the percentage of block grousp that don't fall within HOLC grade
+
+```
+
 
 
 #### Current Conditions
+Create at least two visualizations summarizing current conditions (from the EJScreen data) within HOLC grades using the mean of the following variables (you may combine variables or create separate plots):
+% low income
+percentile for Particulate Matter 2.5
+percentile for low life expectancy
+Use ggplot for your visualizations! You will first need to calculate mean of each variable grouped by HOLC grade.
 
 #### Discussion
+Interpret the patterns you observe in your results
+Discuss potential relationships between historical redlining grades and current environmental/socioeconomic conditions
 
 ## Part 2: Legacy of Redlining in Biodiversity Observations
 #### Observations within Redlined Neighborhoods
+A figure summarizing the percent of observations within redlined neighborhoods within each HOLC grade
+
+Create a visualizations that shows:
+
+The percentage of bird observations within each HOLC grade
+Include an appropiate title, axis labels, and legend
+Hints: Ensure the bird observations and HOLC dataset have matching CRS’, then perform a spatial join to assign each bird observations to a corresponding HOLC grade.
 
 #### Discussion
 
+####### PART 1 ########
+- Make sure CRS match
+- EJ screen: filter to LA
+- st_join with EJ Screen and HOLC to get census blocks on the HOLC data
+        - st_join(): combining the dough (taking the highest geometry) -- changing the geometries and     changing the dataframe (adding attributes)
+        - st_filter(): function that does the cookie cutting; takes part of the dough out but retains the shape of the original
+
+####### PART 2 ########
+- Combine the HOLC and birds data with st_join
+  - group_by() and summarise() to get info
 
 
